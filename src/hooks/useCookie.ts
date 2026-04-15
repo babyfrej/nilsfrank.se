@@ -1,12 +1,11 @@
 "use client";
-import Cookies, { type CookieAttributes } from "js-cookie";
+import Cookie from "js-cookie";
 import { useSyncExternalStore } from "react";
 
 const listeners = new Set<() => void>();
 const cookieStore = {
-  get: (key: string) => Cookies.get(key),
-  set: (key: string, value: string, _options: CookieAttributes) =>
-    Cookies.set(key, value),
+  get: Cookie.get,
+  set: Cookie.set,
   subscribe: (callback: () => void): (() => void) => {
     listeners.add(callback);
     return () => {
@@ -14,9 +13,9 @@ const cookieStore = {
     };
   },
 };
-export const useCookie = (name: string) =>
+export const useCookie = (name: string, initialValue?: string) =>
   useSyncExternalStore(
     cookieStore.subscribe,
-    () => Cookies.get(name),
-    () => undefined,
+    () => Cookie.get(name),
+    () => initialValue,
   );
