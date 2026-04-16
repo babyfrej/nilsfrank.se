@@ -1,4 +1,5 @@
 prisma/data/
+src/lib/prisma/
 
 node_modules
 
