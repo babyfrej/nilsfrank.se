@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isTenantPath, resolveTenant } from "./tenant";
+import { isInternalTenantPath, resolveTenant } from "./tenant";
 
 describe("resolveTenant", () => {
 	test("maps production subdomains to tenants", () => {
@@ -20,16 +20,17 @@ describe("resolveTenant", () => {
 	});
 });
 
-describe("isTenantPath", () => {
-	test("detects paths that address a tenant directory directly", () => {
-		expect(isTenantPath("/frej")).toBe(true);
-		expect(isTenantPath("/helge/slot/1")).toBe(true);
-		expect(isTenantPath("/Frej/slot/1")).toBe(true);
+describe("isInternalTenantPath", () => {
+	test("detects paths into the internal tenant tree", () => {
+		expect(isInternalTenantPath("/tenants")).toBe(true);
+		expect(isInternalTenantPath("/tenants/helge/slot/1")).toBe(true);
+		expect(isInternalTenantPath("/Tenants/frej")).toBe(true);
 	});
 
-	test("does not match unrelated paths", () => {
-		expect(isTenantPath("/")).toBe(false);
-		expect(isTenantPath("/frejs-page")).toBe(false);
-		expect(isTenantPath("/slot/frej")).toBe(false);
+	test("allows tenant names as ordinary public paths", () => {
+		expect(isInternalTenantPath("/")).toBe(false);
+		expect(isInternalTenantPath("/helge")).toBe(false);
+		expect(isInternalTenantPath("/tenants-list")).toBe(false);
+		expect(isInternalTenantPath("/slot/tenants")).toBe(false);
 	});
 });

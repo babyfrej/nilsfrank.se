@@ -1,8 +1,8 @@
 /**
  * Each tenant is a subdomain (`<tenant>.nilsfrank.se`) and a matching page
- * directory (`src/pages/<tenant>/`). The middleware resolves the tenant from
- * the request host and rewrites into that directory, so pages never see the
- * prefix in their URLs.
+ * directory under `src/pages/tenants/<tenant>/`. The middleware resolves the
+ * tenant from the request host and rewrites into that directory, so pages
+ * never see the prefix in their URLs.
  */
 export const TENANTS = ["frej", "helge"] as const;
 
@@ -21,8 +21,11 @@ export function resolveTenant(host: string): Tenant | undefined {
 	return isTenant(subdomain) ? subdomain : undefined;
 }
 
-/** True when a public URL tries to hit a tenant directory directly (`/frej/...`). */
-export function isTenantPath(pathname: string): boolean {
+/** Root of the internal page tree that tenant requests are rewritten into. */
+export const TENANTS_PATH = "/tenants";
+
+/** True when a public URL tries to hit the internal tenant tree directly (`/tenants/...`). */
+export function isInternalTenantPath(pathname: string): boolean {
 	const [, first = ""] = pathname.toLowerCase().split("/");
-	return isTenant(first);
+	return `/${first}` === TENANTS_PATH;
 }
