@@ -1,0 +1,20 @@
+---
+import { Font } from "astro:assets";
+---
+<html lang="sv">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <Font cssVariable="--font-tertiary" preload />
+  </head>
+  <body>
+    <main>
+      <slot />
+    </main>
+  </body>
+</html>
+<style is:global>
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-tertiary);
+  }
+</style>

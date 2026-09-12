@@ -1,0 +1,19 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2026-09-11",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	"name": "frej",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	// One Worker serves every tenant; src/middleware.ts routes by host.
+	"routes": [
+		{ "pattern": "frej.nilsfrank.se", "custom_domain": true },
+		{ "pattern": "helge.nilsfrank.se", "custom_domain": true }
+	],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	}
+}
