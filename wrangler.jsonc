@@ -4,8 +4,9 @@
 	"compatibility_flags": ["global_fetch_strictly_public"],
 	"name": "frej",
 	"main": "@astrojs/cloudflare/entrypoints/server",
-	// One Worker serves every tenant; src/middleware.ts routes by host.
+	// One Worker serves the root site and every tenant; src/middleware.ts routes by host.
 	"routes": [
+		{ "pattern": "nilsfrank.se", "custom_domain": true },
 		{ "pattern": "frej.nilsfrank.se", "custom_domain": true },
 		{ "pattern": "helge.nilsfrank.se", "custom_domain": true }
 	],
