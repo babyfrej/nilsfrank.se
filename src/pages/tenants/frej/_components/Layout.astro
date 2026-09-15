@@ -5,7 +5,8 @@ import { Font } from "astro:assets";
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <Font cssVariable="--font-tertiary" preload />
+    <Font cssVariable="--font-titan-one" preload />
+    <Font cssVariable="--font-nunito" preload />
   </head>
   <body>
     <main>
@@ -14,10 +15,13 @@ import { Font } from "astro:assets";
   </body>
 </html>
 <style is:global>
+  html {
+    font-family: var(--font-nunito);
+  }
   body {
     margin: 0;
   }
   h1, h2, h3, h4, h5 {
-    font-family: var(--font-tertiary);
+    font-family: var(--font-titan-one);
   }
 </style>

@@ -1,11 +1,10 @@
-prisma/data/
-src/lib/prisma/
-
 node_modules
 
-.turbo
-.next
+# build output
+dist
+.astro
+.wrangler
 
 .env.*.local
 .env.keys
-.vercel
+.DS_Store
