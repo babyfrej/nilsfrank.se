@@ -2,8 +2,9 @@
 import { getCollection } from "astro:content";
 /**
  * The Organizer's view at `nilsfrank.se/admin`: every Event from the collection
- * grouped by Tenant, each Slot's booked / seats (overbooked shown as such, never
- * enforced) and all Rsvp rows including declines, newest answer first.
+ * grouped by Tenant, each Slot's adults + children against its seats (overbooked
+ * shown as such, never enforced) and all Rsvp rows including declines, newest
+ * answer first.
  *
  * Only reachable on the root site: a Tenant host rewrites `/admin` into
  * `/tenants/<tenant>/admin`, which is an unknown Event slug and 404s.
@@ -14,10 +15,12 @@ import { getCollection } from "astro:content";
  */
 import { env } from "cloudflare:workers";
 import { createRemoteJWKSet } from "jose";
+import type { Slot } from "../content.config";
 import { db } from "../db/client";
 import { rsvp } from "../db/schema";
 import Layout from "../layouts/Layout.astro";
 import { verifyAccessJwt } from "../lib/access";
+import { eventSlug } from "../lib/event";
 import {
 	formatEventDate,
 	formatSlotTimes,
@@ -46,10 +49,7 @@ const rsvps = await db.select().from(rsvp).orderBy(rsvp.updatedAt);
 const byTenant = Map.groupBy(events, (e) => e.data.tenant);
 const rsvpsFor = (tenant: Tenant, slug: string) =>
 	rsvps.filter((r) => r.tenant === tenant && r.event === slug).reverse();
-const slotLabel = (
-	slots: (typeof events)[number]["data"]["slots"],
-	slotId: string | null,
-) => {
+const slotLabel = (slots: readonly Slot[], slotId: string | null) => {
 	const slot = slots.find((s) => s.id === slotId);
 	return slot ? formatSlotTimes(slot.start, slot.end) : (slotId ?? "–");
 };
@@ -60,7 +60,7 @@ const slotLabel = (
     <section>
       <h2>{tenant}</h2>
       {tenantEvents.map((event) => {
-        const slug = event.id.slice(tenant.length + 1);
+        const slug = eventSlug(event);
         const own = rsvpsFor(tenant, slug);
         return (
           <article>
@@ -68,7 +68,7 @@ const slotLabel = (
             <ul class="slots">
               {slotTotals(event.data.slots, own).map((slot) => (
                 <li class:list={{ overbooked: slot.overbooked }}>
-                  <b>{formatSlotTimes(slot.start, slot.end)}</b> {slot.booked} / {slot.seats} platser
+                  <b>{formatSlotTimes(slot.start, slot.end)}</b> {slot.adults} vuxna + {slot.children} barn = {slot.booked} / {slot.seats} platser
                   {slot.overbooked && <span> – överbokad</span>}
                 </li>
               ))}
@@ -110,6 +110,10 @@ const slotLabel = (
     padding: 1rem;
     font-family: system-ui, sans-serif;
     font-size: 0.95rem;
+  }
+  /* A working view, not an Event page: no display font on the headings. */
+  h1, h2, h3, h4, h5 {
+    font-family: inherit;
   }
   h2 {
     text-transform: capitalize;

@@ -24,6 +24,11 @@ export function formatEventDate(isoDate: string): string {
 	return eventDate.format(new Date(isoDate));
 }
 
+/** `"070-123 45 67"` → `"tel:0701234567"`, so the contact's number dials as written. */
+export function telHref(phone: string) {
+	return `tel:${phone.replace(/[\s-]/g, "")}`;
+}
+
 /** Start and end of a Slot as `"14:00–15:30"` in Swedish local time. */
 export function formatSlotTimes(isoStart: string, isoEnd: string): string {
 	return slotTime.formatRange(new Date(isoStart), new Date(isoEnd));

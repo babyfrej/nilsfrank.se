@@ -1,12 +1,12 @@
 ---
 /**
  * Frej's landing page at frej.nilsfrank.se. Deliberately neutral: it lists no
- * Events, so a Guest only reaches an invitation through its own link.
+ * Events, so a Guest only reaches an Event through its own link.
  * Server rendered: the middleware rewrite cannot target a prerendered page on the
  * Cloudflare adapter (see src/middleware.ts).
  */
 import Dino from "../../../components/frej/dino.astro";
-import Layout from "../_components/Layout.astro";
+import Layout from "../../../layouts/Layout.astro";
 ---
 <Layout title="Frej">
   <section class="landing">

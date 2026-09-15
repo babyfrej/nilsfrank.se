@@ -19,20 +19,6 @@ export default defineConfig({
 	},
 	fonts: [
 		{
-			provider: fontProviders.local(),
-			name: "BlueCustard",
-			cssVariable: "--font-tertiary",
-			options: {
-				variants: [
-					{
-						src: ["./public/fonts/blue-custard.woff"],
-						weight: "normal",
-						style: "normal",
-					},
-				],
-			},
-		},
-		{
 			provider: fontProviders.google(),
 			name: "Nunito",
 			weights: [400, 800],

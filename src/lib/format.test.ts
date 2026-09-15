@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { formatEventDate, formatSlotTimes, formatUpdatedAt } from "./format";
+import {
+	formatEventDate,
+	formatSlotTimes,
+	formatUpdatedAt,
+	telHref,
+} from "./format";
 
 describe("formatEventDate", () => {
 	test("spells out a date in Swedish", () => {
 		expect(formatEventDate("2026-10-17")).toBe("lördag 17 oktober 2026");
+	});
+});
+
+describe("telHref", () => {
+	test("strips spaces and dashes so the number dials", () => {
+		expect(telHref("070-123 45 67")).toBe("tel:0701234567");
 	});
 });
 

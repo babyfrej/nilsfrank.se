@@ -1,6 +1,6 @@
 ---
 /**
- * The invitation a Guest opens at `<tenant>.nilsfrank.se/<slug>`. The middleware
+ * The Event page a Guest opens at `<tenant>.nilsfrank.se/<slug>`. The middleware
  * rewrites that host + path to `/tenants/<tenant>/<slug>`, and the entry is
  * looked up by both the resolved Tenant and the slug so one Tenant's Event can
  * never be opened on another Tenant's host.
@@ -20,27 +20,32 @@ import { getEntry, render } from "astro:content";
 import { and, eq } from "drizzle-orm";
 import { db } from "../../../db/client";
 import { rsvp } from "../../../db/schema";
-import { formatEventDate, formatSlotTimes } from "../../../lib/format";
-import { type RsvpInput, slotTotals } from "../../../lib/rsvp";
-import Layout from "../_components/Layout.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { eventId } from "../../../lib/event";
+import { formatEventDate, formatSlotTimes, telHref } from "../../../lib/format";
+import { RSVP_DEFAULTS, type RsvpInput, slotTotals } from "../../../lib/rsvp";
 
 // The `[tenant]` segment only shapes the rewritten URL; the Tenant itself is taken
 // from locals so the lookup cannot be steered by the path.
 const { slug = "" } = Astro.params;
 const tenant = Astro.locals.tenant;
 const event = tenant
-	? await getEntry("events", `${tenant}/${slug}`)
+	? await getEntry("events", eventId(tenant, slug))
 	: undefined;
 if (!event) return new Response(null, { status: 404 });
 
 const result = Astro.getActionResult(actions.rsvp.submit);
 if (result && !result.error) return Astro.redirect(`/${slug}?tack`, 303);
 const fieldErrors = isInputError(result?.error) ? result.error.fields : {};
-// Anything without a field of its own (unknown Event, tampered hidden `event`) gets the banner.
-const submitFailed =
+// Anything without an input of its own (unknown Event, tampered hidden `event`,
+// a POST without a submit button) gets the banner instead of a field message.
+const hasGeneralError =
 	result?.error !== undefined &&
-	(!isInputError(result.error) || fieldErrors.event !== undefined);
-const failed = result?.error ? Astro.locals.submitted : undefined;
+	(!isInputError(result.error) ||
+		fieldErrors.event !== undefined ||
+		fieldErrors.attending !== undefined);
+// The rejected form's values, kept by the middleware, so the Guest keeps their input.
+const submitted = result?.error ? Astro.locals.submitted : undefined;
 const saved = Astro.url.searchParams.has("tack");
 
 const { Content } = await render(event);
@@ -57,15 +62,18 @@ const totals = slotTotals(slots, rsvps);
 const guestEmail = Astro.cookies.get("guest")?.value;
 const own = guestEmail ? rsvps.find((r) => r.email === guestEmail) : undefined;
 
-/** Prefill: a failed submission's values win over the stored Rsvp. */
+/** Prefill: a rejected submission's values win over the stored Rsvp. */
 const field = (
 	name: keyof RsvpInput,
 	stored: string | number | null | undefined,
-) => (failed ? (failed.get(name)?.toString() ?? "") : String(stored ?? ""));
-const pickedSlot = failed ? failed.get("slotId")?.toString() : own?.slotId;
+) =>
+	submitted ? (submitted.get(name)?.toString() ?? "") : String(stored ?? "");
+const pickedSlot = submitted
+	? submitted.get("slotId")?.toString()
+	: own?.slotId;
 ---
 <Layout title={title}>
-  <article class="invitation">
+  <article class="event">
     <header class="intro">
       <h1>{title}</h1>
       <Content />
@@ -100,8 +108,8 @@ const pickedSlot = failed ? failed.get("slotId")?.toString() : own?.slotId;
     <section class="rsvp" id="svara">
       <h2>Svara</h2>
       {saved && <p class="notice" role="status">Tack! Ert svar är sparat. Ni kan ändra det här när som helst.</p>}
-      {submitFailed && <p class="error" role="alert">Något gick fel, försök igen.</p>}
-      {own && !own.attending && !failed && <p class="notice">Ni har svarat att ni inte kan komma.</p>}
+      {hasGeneralError && <p class="error" role="alert">Något gick fel, försök igen.</p>}
+      {own && !own.attending && !submitted && <p class="notice">Ni har svarat att ni inte kan komma.</p>}
 
       <form method="POST" action={actions.rsvp.submit}>
         <input type="hidden" name="event" value={slug} />
@@ -131,12 +139,12 @@ const pickedSlot = failed ? failed.get("slotId")?.toString() : own?.slotId;
         <div class="counts">
           <label>
             Vuxna
-            <input type="number" name="adults" min="1" value={field("adults", own?.adults ?? 1)} />
+            <input type="number" name="adults" min="1" value={field("adults", own?.adults ?? RSVP_DEFAULTS.adults)} />
             {fieldErrors.adults && <span class="error">{fieldErrors.adults[0]}</span>}
           </label>
           <label>
             Barn
-            <input type="number" name="children" min="0" value={field("children", own?.children ?? 0)} />
+            <input type="number" name="children" min="0" value={field("children", own?.children ?? RSVP_DEFAULTS.children)} />
             {fieldErrors.children && <span class="error">{fieldErrors.children[0]}</span>}
           </label>
         </div>
@@ -149,13 +157,13 @@ const pickedSlot = failed ? failed.get("slotId")?.toString() : own?.slotId;
         <button name="attending" value="false" class="decline">Vi kan tyvärr inte komma</button>
       </form>
 
-      <p class="deadline">Svara senast <strong>{formatEventDate(rsvpBy)}</strong>. Frågor? {contact.name}, <a href={`mailto:${contact.email}`}>{contact.email}</a></p>
+      <p class="deadline">Svara senast <strong>{formatEventDate(rsvpBy)}</strong>. Frågor? {contact.name}, <a href={telHref(contact.phone)}>{contact.phone}</a> eller <a href={`mailto:${contact.email}`}>{contact.email}</a></p>
     </section>
   </article>
 </Layout>
 
 <style>
-  .invitation {
+  .event {
     --paper: #efe4cf; --ink: #3b2f1e; --path: #8b5a2b; --accent: #d9822b;
     min-height: 100dvh; background: var(--paper); color: var(--ink);
     padding: 32px 16px 48px; overflow-x: clip; font-weight: 700;

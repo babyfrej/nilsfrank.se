@@ -1,18 +1,17 @@
 import { ActionError, defineAction } from "astro:actions";
 import { getEntry } from "astro:content";
-import { z } from "astro/zod";
 import { sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { rsvp } from "../db/schema";
-import { normaliseRsvp, type RsvpErrors } from "../lib/rsvp";
-
-const integer = z.number({ error: "Ange ett heltal" }).int("Ange ett heltal");
+import { eventId } from "../lib/event";
+import { normaliseRsvp, type RsvpErrors, rsvpInput } from "../lib/rsvp";
 
 /**
  * Field errors for the page to show next to inputs. Astro does not export
  * `ActionInputError`, but it serialises any `ActionError` by spreading its own
  * fields and deserialises a `type` of `AstroActionInputError` with `issues` back
  * into one, so `isInputError(result.error)` and `error.fields` work on the page.
+ * Relies on those internals; verified against astro 7.3.2, re-check on upgrade.
  */
 class RsvpInputError extends ActionError {
 	override type = "AstroActionInputError";
@@ -36,23 +35,11 @@ export const server = {
 		 */
 		submit: defineAction({
 			accept: "form",
-			input: z.object({
-				event: z.string(),
-				slotId: z.string().optional(),
-				attending: z.boolean(),
-				email: z.email({ error: "Ange en giltig e-postadress" }),
-				name: z
-					.string({ error: "Ange ert namn" })
-					.trim()
-					.min(1, "Ange ert namn"),
-				adults: integer.optional(),
-				children: integer.optional(),
-				notes: z.string().optional(),
-			}),
+			input: rsvpInput,
 			handler: async ({ event: slug, ...input }, context) => {
 				const tenant = context.locals.tenant;
 				if (!tenant) throw new ActionError({ code: "NOT_FOUND" });
-				const event = await getEntry("events", `${tenant}/${slug}`);
+				const event = await getEntry("events", eventId(tenant, slug));
 				if (!event) throw new ActionError({ code: "NOT_FOUND" });
 
 				const { row, errors } = normaliseRsvp(input, event.data.slots);

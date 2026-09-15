@@ -19,37 +19,38 @@ const slot = z
 		path: ["end"],
 	});
 
+const event = z.object({
+	tenant: z.enum(TENANTS),
+	title: z.string().min(1),
+	date: z.iso.date(),
+	place: z.string().min(1),
+	program: z.array(
+		z.object({ time: z.string().min(1), text: z.string().min(1) }),
+	),
+	rsvpBy: z.iso.date(),
+	contact: z.object({
+		name: z.string().min(1),
+		phone: z.string().min(1),
+		email: z.email(),
+	}),
+	slots: z
+		.array(slot)
+		.min(1)
+		.refine((slots) => new Set(slots.map((s) => s.id)).size === slots.length, {
+			message: "Slot ids must be unique within an Event",
+		}),
+});
+
+export type Slot = z.infer<typeof slot>;
+
 /**
  * One Event per file under `src/content/events/<tenant>/<slug>.md`, so the entry
- * id is `<tenant>/<slug>` and the slug is the invite path under the Tenant host.
- * The markdown body is the invitation text.
+ * id is `<tenant>/<slug>` (see `lib/event.ts`) and the slug is the Event's path
+ * under the Tenant host. The markdown body is the Event text.
  */
 const events = defineCollection({
 	loader: glob({ base: "./src/content/events", pattern: "*/*.md" }),
-	schema: z.object({
-		tenant: z.enum(TENANTS),
-		title: z.string().min(1),
-		date: z.iso.date(),
-		place: z.string().min(1),
-		program: z.array(
-			z.object({ time: z.string().min(1), text: z.string().min(1) }),
-		),
-		rsvpBy: z.iso.date(),
-		contact: z.object({
-			name: z.string().min(1),
-			phone: z.string().min(1),
-			email: z.email(),
-		}),
-		slots: z
-			.array(slot)
-			.min(1)
-			.refine(
-				(slots) => new Set(slots.map((s) => s.id)).size === slots.length,
-				{
-					message: "Slot ids must be unique within an Event",
-				},
-			),
-	}),
+	schema: event,
 });
 
 export const collections = { events };

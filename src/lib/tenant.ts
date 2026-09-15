@@ -1,8 +1,9 @@
 /**
- * Each tenant is a subdomain (`<tenant>.nilsfrank.se`) and a matching page
- * directory under `src/pages/tenants/<tenant>/`. The middleware resolves the
- * tenant from the request host and rewrites into that directory, so pages
- * never see the prefix in their URLs.
+ * Each Tenant is a subdomain (`<tenant>.nilsfrank.se`). The middleware resolves
+ * the Tenant from the request host and rewrites into `src/pages/tenants/`, where
+ * `<tenant>/index.astro` is that Tenant's hand-written landing page and the shared
+ * `[tenant]/[slug].astro` renders its Events, so pages never see the prefix in
+ * their URLs.
  */
 export const TENANTS = ["frej", "helge"] as const;
 
