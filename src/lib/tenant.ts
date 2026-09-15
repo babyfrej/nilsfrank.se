@@ -29,3 +29,17 @@ export function isInternalTenantPath(pathname: string): boolean {
 	const [, first = ""] = pathname.toLowerCase().split("/");
 	return `/${first}` === TENANTS_PATH;
 }
+
+/** Astro serves Actions called over RPC under this prefix (`/_actions/<name>`). */
+const ACTIONS_PATH = "/_actions/";
+
+/**
+ * True for Astro's action endpoint. Those requests must not be rewritten into the
+ * tenant tree: the route exists only at the root, so a rewrite would 404 every form
+ * POST made on a Tenant host.
+ */
+export function isActionPath(pathname: string): boolean {
+	return (
+		pathname.startsWith(ACTIONS_PATH) && pathname.length > ACTIONS_PATH.length
+	);
+}

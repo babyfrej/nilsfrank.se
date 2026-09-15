@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isInternalTenantPath, resolveTenant } from "./tenant";
+import { isActionPath, isInternalTenantPath, resolveTenant } from "./tenant";
 
 describe("resolveTenant", () => {
 	test("maps production subdomains to tenants", () => {
@@ -32,5 +32,19 @@ describe("isInternalTenantPath", () => {
 		expect(isInternalTenantPath("/helge")).toBe(false);
 		expect(isInternalTenantPath("/tenants-list")).toBe(false);
 		expect(isInternalTenantPath("/slot/tenants")).toBe(false);
+	});
+});
+
+describe("isActionPath", () => {
+	test("detects Astro's action endpoint so form POSTs bypass the tenant rewrite", () => {
+		expect(isActionPath("/_actions/rsvp.submit")).toBe(true);
+		expect(isActionPath("/_actions/rsvp.submit/")).toBe(true);
+	});
+
+	test("leaves ordinary paths alone", () => {
+		expect(isActionPath("/")).toBe(false);
+		expect(isActionPath("/kalas")).toBe(false);
+		expect(isActionPath("/_actions")).toBe(false);
+		expect(isActionPath("/kalas/_actions/x")).toBe(false);
 	});
 });

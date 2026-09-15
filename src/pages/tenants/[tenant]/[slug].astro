@@ -6,17 +6,22 @@
  * never be opened on another Tenant's host.
  *
  * Rendered per request (no `prerender`): the Slots show live "booked / seats"
- * from the Rsvps in D1. Ticket #5 adds the Rsvp form.
+ * from the Rsvps in D1, and the Rsvp form is prefilled with the household's own
+ * row when the `guest` cookie (set by the action) names it. Zero client JS:
+ * the form posts to `rsvp.submit`; a success redirects back here with `?tack`
+ * (POST → redirect → GET, so a reload never resubmits), errors render straight
+ * into the POST response next to the fields, with the typed values kept.
  *
  * Mobile-first "expedition trail": a wavy path snakes down the page with the
- * facts as numbered stops, ending at the Slots and the RSVP deadline.
+ * facts as numbered stops; the Slots and the Rsvp form follow as the goal.
  */
+import { actions, isInputError } from "astro:actions";
 import { getEntry, render } from "astro:content";
 import { and, eq } from "drizzle-orm";
 import { db } from "../../../db/client";
 import { rsvp } from "../../../db/schema";
 import { formatEventDate, formatSlotTimes } from "../../../lib/format";
-import { slotTotals } from "../../../lib/rsvp";
+import { type RsvpInput, slotTotals } from "../../../lib/rsvp";
 import Layout from "../_components/Layout.astro";
 
 // The `[tenant]` segment only shapes the rewritten URL; the Tenant itself is taken
@@ -28,6 +33,16 @@ const event = tenant
 	: undefined;
 if (!event) return new Response(null, { status: 404 });
 
+const result = Astro.getActionResult(actions.rsvp.submit);
+if (result && !result.error) return Astro.redirect(`/${slug}?tack`, 303);
+const fieldErrors = isInputError(result?.error) ? result.error.fields : {};
+// Anything without a field of its own (unknown Event, tampered hidden `event`) gets the banner.
+const submitFailed =
+	result?.error !== undefined &&
+	(!isInputError(result.error) || fieldErrors.event !== undefined);
+const failed = result?.error ? Astro.locals.submitted : undefined;
+const saved = Astro.url.searchParams.has("tack");
+
 const { Content } = await render(event);
 const { title, date, place, program, rsvpBy, contact, slots } = event.data;
 
@@ -38,8 +53,16 @@ const rsvps = await db
 	.where(and(eq(rsvp.tenant, tenant), eq(rsvp.event, slug)));
 const totals = slotTotals(slots, rsvps);
 
-/** Digits-only form for `sms:` / `tel:` links. */
-const phoneHref = contact.phone.replace(/[^\d+]/g, "");
+// The household's own Rsvp, remembered by the `guest` cookie the action set.
+const guestEmail = Astro.cookies.get("guest")?.value;
+const own = guestEmail ? rsvps.find((r) => r.email === guestEmail) : undefined;
+
+/** Prefill: a failed submission's values win over the stored Rsvp. */
+const field = (
+	name: keyof RsvpInput,
+	stored: string | number | null | undefined,
+) => (failed ? (failed.get(name)?.toString() ?? "") : String(stored ?? ""));
+const pickedSlot = failed ? failed.get("slotId")?.toString() : own?.slotId;
 ---
 <Layout title={title}>
   <article class="invitation">
@@ -71,28 +94,63 @@ const phoneHref = contact.phone.replace(/[^\d+]/g, "");
           <h2>Program</h2>
           <ul>{program.map((p) => <li><b>{p.time}</b> {p.text}</li>)}</ul>
         </li>
-        <li class="stop slots">
-          <span class="footprint" aria-hidden="true"></span>
-          <span class="number">4</span>
-          <h2>Tider</h2>
-          <ul>
-            {totals.map((slot) => (
-              <li>
-                <b>{formatSlotTimes(slot.start, slot.end)}</b>
-                {slot.booked} / {slot.seats} platser
-              </li>
-            ))}
-          </ul>
-        </li>
       </ol>
     </div>
 
-    <footer class="goal">
-      <h2>Vi ses!</h2>
-      <p>Svara senast <strong>{formatEventDate(rsvpBy)}</strong> till {contact.name}</p>
-      <a href={`sms:${phoneHref}`}>Skicka SMS</a>
-      <a href={`mailto:${contact.email}`}>Skicka e-post</a>
-    </footer>
+    <section class="rsvp" id="svara">
+      <h2>Svara</h2>
+      {saved && <p class="notice" role="status">Tack! Ert svar är sparat. Ni kan ändra det här när som helst.</p>}
+      {submitFailed && <p class="error" role="alert">Något gick fel, försök igen.</p>}
+      {own && !own.attending && !failed && <p class="notice">Ni har svarat att ni inte kan komma.</p>}
+
+      <form method="POST" action={actions.rsvp.submit}>
+        <input type="hidden" name="event" value={slug} />
+
+        <fieldset>
+          <legend>Tid</legend>
+          {totals.map((slot) => (
+            <label class="slot">
+              <input type="radio" name="slotId" value={slot.id} checked={pickedSlot === slot.id} />
+              <b>{formatSlotTimes(slot.start, slot.end)}</b>
+              <span>{slot.booked} / {slot.seats} platser</span>
+            </label>
+          ))}
+          {fieldErrors.slotId && <p class="error">{fieldErrors.slotId[0]}</p>}
+        </fieldset>
+
+        <label>
+          Namn
+          <input type="text" name="name" value={field("name", own?.name)} required autocomplete="name" />
+          {fieldErrors.name && <span class="error">{fieldErrors.name[0]}</span>}
+        </label>
+        <label>
+          E-post
+          <input type="email" name="email" value={field("email", own?.email)} required autocomplete="email" />
+          {fieldErrors.email && <span class="error">{fieldErrors.email[0]}</span>}
+        </label>
+        <div class="counts">
+          <label>
+            Vuxna
+            <input type="number" name="adults" min="1" value={field("adults", own?.adults ?? 1)} />
+            {fieldErrors.adults && <span class="error">{fieldErrors.adults[0]}</span>}
+          </label>
+          <label>
+            Barn
+            <input type="number" name="children" min="0" value={field("children", own?.children ?? 0)} />
+            {fieldErrors.children && <span class="error">{fieldErrors.children[0]}</span>}
+          </label>
+        </div>
+        <label>
+          Allergier eller annat
+          <textarea name="notes" rows="2">{field("notes", own?.notes)}</textarea>
+        </label>
+
+        <button name="attending" value="true">Vi kommer!</button>
+        <button name="attending" value="false" class="decline">Vi kan tyvärr inte komma</button>
+      </form>
+
+      <p class="deadline">Svara senast <strong>{formatEventDate(rsvpBy)}</strong>. Frågor? {contact.name}, <a href={`mailto:${contact.email}`}>{contact.email}</a></p>
+    </section>
   </article>
 </Layout>
 
@@ -132,17 +190,33 @@ const phoneHref = contact.phone.replace(/[^\d+]/g, "");
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238b5a2b'%3E%3Cellipse cx='12' cy='16' rx='6' ry='6'/%3E%3Cellipse cx='5' cy='7' rx='2.5' ry='4'/%3E%3Cellipse cx='12' cy='4' rx='2.5' ry='4'/%3E%3Cellipse cx='19' cy='7' rx='2.5' ry='4'/%3E%3C/svg%3E") no-repeat center / contain;
   }
   .stop:nth-child(even) .footprint { right: auto; left: 10%; transform: rotate(-20deg); }
-  .program ul, .slots ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
-  .program b, .slots b { font-family: ui-monospace, monospace; margin-right: 8px; }
+  .program ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
+  .program b { font-family: ui-monospace, monospace; margin-right: 8px; }
 
-  .goal {
-    max-width: 520px; margin: 24px auto 0; padding: 24px 20px; text-align: center;
+  .rsvp {
+    max-width: 520px; margin: 24px auto 0; padding: 24px 20px;
     background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 18px;
-    display: grid; gap: 8px;
+    display: grid; gap: 12px;
   }
-  .goal h2 { margin: 0; font-size: 34px; }
-  .goal p { margin: 0 0 8px; }
-  .goal a { display: block; padding: 14px; background: #fff; color: var(--ink); text-decoration: none; border-radius: 999px; font-weight: 700; }
+  .rsvp h2 { margin: 0; font-size: 34px; text-align: center; }
+  .rsvp form { display: grid; gap: 12px; }
+  .rsvp fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; }
+  .rsvp legend, .rsvp label { font-size: 15px; display: grid; gap: 4px; }
+  .rsvp legend { padding: 0; margin-bottom: 4px; }
+  .slot { display: flex !important; align-items: center; gap: 10px; padding: 10px 12px; background: #fff9ee; color: var(--ink); border-radius: 10px; }
+  .slot b { font-family: ui-monospace, monospace; }
+  .slot span { margin-left: auto; font-size: 13px; }
+  .rsvp input:not([type="radio"]), .rsvp textarea {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px;
+    font: inherit; color: var(--ink); background: #fff9ee;
+  }
+  .counts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rsvp button { padding: 14px; background: #fff; color: var(--ink); border: 2px solid var(--ink); border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; }
+  .rsvp button.decline { background: transparent; color: #fff; border-color: #fff; }
+  .notice, .error { margin: 0; font-size: 14px; }
+  .error { color: #fff; background: rgba(59, 47, 30, .35); padding: 4px 8px; border-radius: 6px; }
+  .deadline { margin: 8px 0 0; text-align: center; font-size: 14px; }
+  .deadline a { color: #fff; }
 
   @media (min-width: 640px) { .stop { width: 60%; } }
 </style>
