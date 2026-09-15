@@ -14,6 +14,16 @@
 		"directory": "./dist",
 		"binding": "ASSETS"
 	},
+	// Rsvps only (ADR 0001). database_id is a placeholder until the Organizer creates the
+	// database at cutover (#7); locally, wrangler only needs it to be a valid UUID.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "nilsfrank-se",
+			"database_id": "00000000-0000-4000-8000-000000000000",
+			"migrations_dir": "drizzle"
+		}
+	],
 	"observability": {
 		"enabled": true
 	}

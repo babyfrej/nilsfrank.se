@@ -6,7 +6,9 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false
+		"ignoreUnknown": false,
+		// Generated: `wrangler types` and `drizzle-kit generate`.
+		"includes": ["**", "!worker-configuration.d.ts", "!drizzle/meta"]
 	},
 	"formatter": {
 		"enabled": true,

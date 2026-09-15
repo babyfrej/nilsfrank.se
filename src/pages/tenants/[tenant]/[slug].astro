@@ -5,14 +5,18 @@
  * looked up by both the resolved Tenant and the slug so one Tenant's Event can
  * never be opened on another Tenant's host.
  *
- * Rendered per request (no `prerender`): the next ticket adds live seat counts
- * from D1 and the Rsvp form here.
+ * Rendered per request (no `prerender`): the Slots show live "booked / seats"
+ * from the Rsvps in D1. Ticket #5 adds the Rsvp form.
  *
  * Mobile-first "expedition trail": a wavy path snakes down the page with the
  * facts as numbered stops, ending at the Slots and the RSVP deadline.
  */
 import { getEntry, render } from "astro:content";
+import { and, eq } from "drizzle-orm";
+import { db } from "../../../db/client";
+import { rsvp } from "../../../db/schema";
 import { formatEventDate, formatSlotTimes } from "../../../lib/format";
+import { slotTotals } from "../../../lib/rsvp";
 import Layout from "../_components/Layout.astro";
 
 // The `[tenant]` segment only shapes the rewritten URL; the Tenant itself is taken
@@ -26,6 +30,13 @@ if (!event) return new Response(null, { status: 404 });
 
 const { Content } = await render(event);
 const { title, date, place, program, rsvpBy, contact, slots } = event.data;
+
+// Rsvps live in D1, Slots in frontmatter; joined here in memory (ADR 0001).
+const rsvps = await db
+	.select()
+	.from(rsvp)
+	.where(and(eq(rsvp.tenant, tenant), eq(rsvp.event, slug)));
+const totals = slotTotals(slots, rsvps);
 
 /** Digits-only form for `sms:` / `tel:` links. */
 const phoneHref = contact.phone.replace(/[^\d+]/g, "");
@@ -65,8 +76,11 @@ const phoneHref = contact.phone.replace(/[^\d+]/g, "");
           <span class="number">4</span>
           <h2>Tider</h2>
           <ul>
-            {slots.map((slot) => (
-              <li><b>{formatSlotTimes(slot.start, slot.end)}</b> {slot.seats} platser</li>
+            {totals.map((slot) => (
+              <li>
+                <b>{formatSlotTimes(slot.start, slot.end)}</b>
+                {slot.booked} / {slot.seats} platser
+              </li>
             ))}
           </ul>
         </li>
