@@ -2,7 +2,7 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"compatibility_date": "2026-09-11",
 	"compatibility_flags": ["global_fetch_strictly_public"],
-	"name": "frej",
+	"name": "nilsfrank-se",
 	"main": "@astrojs/cloudflare/entrypoints/server",
 	// One Worker serves the root site and every tenant; src/middleware.ts routes by host.
 	"routes": [

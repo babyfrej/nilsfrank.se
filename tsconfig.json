@@ -4,19 +4,9 @@
 		"types": ["bun"],
 		"sourceMap": true,
 		"noPropertyAccessFromIndexSignature": true,
-		"jsx": "react-jsx",
 		"verbatimModuleSyntax": true,
 		"noUncheckedSideEffectImports": true,
 		"skipLibCheck": true
 	},
-	"include": [
-		".astro/types.d.ts",
-		"worker-configuration.d.ts",
-		"src/env.d.ts",
-		"src/middleware.ts",
-		"src/lib/tenant.ts",
-		"src/lib/tenant.test.ts",
-		"src/pages/**/*",
-		"src/layouts/**/*"
-	]
+	"include": [".astro/types.d.ts", "worker-configuration.d.ts", "src/**/*"]
 }
