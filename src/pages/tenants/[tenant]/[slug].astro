@@ -1,0 +1,134 @@
+---
+/**
+ * The invitation a Guest opens at `<tenant>.nilsfrank.se/<slug>`. The middleware
+ * rewrites that host + path to `/tenants/<tenant>/<slug>`, and the entry is
+ * looked up by both the resolved Tenant and the slug so one Tenant's Event can
+ * never be opened on another Tenant's host.
+ *
+ * Rendered per request (no `prerender`): the next ticket adds live seat counts
+ * from D1 and the Rsvp form here.
+ *
+ * Mobile-first "expedition trail": a wavy path snakes down the page with the
+ * facts as numbered stops, ending at the Slots and the RSVP deadline.
+ */
+import { getEntry, render } from "astro:content";
+import { formatEventDate, formatSlotTimes } from "../../../lib/format";
+import Layout from "../_components/Layout.astro";
+
+// The `[tenant]` segment only shapes the rewritten URL; the Tenant itself is taken
+// from locals so the lookup cannot be steered by the path.
+const { slug = "" } = Astro.params;
+const tenant = Astro.locals.tenant;
+const event = tenant
+	? await getEntry("events", `${tenant}/${slug}`)
+	: undefined;
+if (!event) return new Response(null, { status: 404 });
+
+const { Content } = await render(event);
+const { title, date, place, program, rsvpBy, contact, slots } = event.data;
+
+/** Digits-only form for `sms:` / `tel:` links. */
+const phoneHref = contact.phone.replace(/[^\d+]/g, "");
+---
+<Layout title={title}>
+  <article class="invitation">
+    <header class="intro">
+      <h1>{title}</h1>
+      <Content />
+    </header>
+
+    <div class="trail">
+      <svg class="path" viewBox="0 0 100 1000" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M25 0 C 25 120, 75 130, 75 250 S 25 380, 25 500 S 75 630, 75 750 S 50 900, 50 1000" />
+      </svg>
+      <ol>
+        <li class="stop">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">1</span>
+          <h2>När</h2>
+          <p>{formatEventDate(date)}</p>
+        </li>
+        <li class="stop">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">2</span>
+          <h2>Var</h2>
+          <p>{place}</p>
+        </li>
+        <li class="stop program">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">3</span>
+          <h2>Program</h2>
+          <ul>{program.map((p) => <li><b>{p.time}</b> {p.text}</li>)}</ul>
+        </li>
+        <li class="stop slots">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">4</span>
+          <h2>Tider</h2>
+          <ul>
+            {slots.map((slot) => (
+              <li><b>{formatSlotTimes(slot.start, slot.end)}</b> {slot.seats} platser</li>
+            ))}
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <footer class="goal">
+      <h2>Vi ses!</h2>
+      <p>Svara senast <strong>{formatEventDate(rsvpBy)}</strong> till {contact.name}</p>
+      <a href={`sms:${phoneHref}`}>Skicka SMS</a>
+      <a href={`mailto:${contact.email}`}>Skicka e-post</a>
+    </footer>
+  </article>
+</Layout>
+
+<style>
+  .invitation {
+    --paper: #efe4cf; --ink: #3b2f1e; --path: #8b5a2b; --accent: #d9822b;
+    min-height: 100dvh; background: var(--paper); color: var(--ink);
+    padding: 32px 16px 48px; overflow-x: clip; font-weight: 700;
+  }
+  .intro { margin-bottom: 24px; }
+  .intro h1 { font-size: clamp(38px, 12vw, 56px); margin: 4px 0 8px; color: var(--accent); line-height: 1; text-wrap: balance; text-shadow: 0 5px 0 var(--path); text-transform: uppercase; }
+  .intro :global(p) { margin: 4px 0 0; line-height: 1.35; }
+
+  .trail { position: relative; max-width: 520px; margin: 0 auto; }
+  .path { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .path path { fill: none; stroke: var(--path); stroke-width: 3; stroke-dasharray: 10 8; vector-effect: non-scaling-stroke; }
+  .trail ol { list-style: none; margin: 0; padding: 12px 0; display: grid; gap: 40px; }
+  .stop {
+    position: relative; width: 72%; padding: 18px 18px 18px 40px;
+    background: #fff9ee; border: 2px solid var(--path); border-radius: 4px 18px 4px 18px;
+    box-shadow: 4px 4px 0 rgba(59, 47, 30, .15);
+    /* stops alternate sides of the path and tilt a little */
+    justify-self: start; rotate: -1.5deg;
+  }
+  .stop:nth-child(even) { justify-self: end; rotate: 1.5deg; }
+
+  .number {
+    position: absolute; left: -18px; top: 14px; width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--accent); color: #fff;
+    font-family: var(--font-titan-one); font-size: 22px; border: 3px solid var(--paper);
+  }
+  .stop h2 { margin: 0 0 4px; font-size: 22px; }
+  .stop p { margin: 0; line-height: 1.35; font-size: 15px; }
+  /* three-toed footprint above each stop, on the path side */
+  .footprint {
+    position: absolute; top: -28px; right: 10%; width: 26px; height: 26px; opacity: .55; transform: rotate(20deg);
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238b5a2b'%3E%3Cellipse cx='12' cy='16' rx='6' ry='6'/%3E%3Cellipse cx='5' cy='7' rx='2.5' ry='4'/%3E%3Cellipse cx='12' cy='4' rx='2.5' ry='4'/%3E%3Cellipse cx='19' cy='7' rx='2.5' ry='4'/%3E%3C/svg%3E") no-repeat center / contain;
+  }
+  .stop:nth-child(even) .footprint { right: auto; left: 10%; transform: rotate(-20deg); }
+  .program ul, .slots ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
+  .program b, .slots b { font-family: ui-monospace, monospace; margin-right: 8px; }
+
+  .goal {
+    max-width: 520px; margin: 24px auto 0; padding: 24px 20px; text-align: center;
+    background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 18px;
+    display: grid; gap: 8px;
+  }
+  .goal h2 { margin: 0; font-size: 34px; }
+  .goal p { margin: 0 0 8px; }
+  .goal a { display: block; padding: 14px; background: #fff; color: var(--ink); text-decoration: none; border-radius: 999px; font-weight: 700; }
+
+  @media (min-width: 640px) { .stop { width: 60%; } }
+</style>

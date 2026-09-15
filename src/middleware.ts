@@ -14,6 +14,12 @@ import {
  *
  * Static assets (`/_astro/*`, `public/*`) never reach this middleware: Cloudflare
  * serves them before the Worker (no `run_worker_first`), and Vite does the same in dev.
+ *
+ * Every tenant page is server rendered. Spike (ticket #3, Astro 7.3 + @astrojs/cloudflare
+ * 14.3): with `prerender = true` on the landing pages, `next("/tenants/frej/")` throws
+ * "Unexpectedly unable to find a component instance for route /tenants/frej" (500), since
+ * prerendered routes are not in the server manifest. The prerendered HTML is also served
+ * by the assets layer at `nilsfrank.se/tenants/frej/`, bypassing the guard below.
  */
 export const onRequest = defineMiddleware((context, next) => {
 	// The internal tenant tree is never addressable from the outside.

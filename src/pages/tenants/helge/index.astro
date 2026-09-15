@@ -1,6 +1,10 @@
 ---
-import Layout from "../../../layouts/Layout.astro";
+/**
+ * Helge's landing page at helge.nilsfrank.se; lists no Events. Server rendered:
+ * the middleware rewrite cannot target a prerendered page (see src/middleware.ts).
+ */
+import Layout from "../_components/Layout.astro";
 ---
-<Layout>
-  <h1>Party Helge</h1>
+<Layout title="Helge">
+  <h1>Helge</h1>
 </Layout>

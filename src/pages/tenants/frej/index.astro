@@ -1,109 +1,28 @@
 ---
 /**
- * Frej's dinosaur party invitation, served at frej.nilsfrank.se.
- * Mobile-first "expedition trail": a wavy path snakes down the page with the
- * facts as numbered stops, ending at the OSA (RSVP) goal.
+ * Frej's landing page at frej.nilsfrank.se. Deliberately neutral: it lists no
+ * Events, so a Guest only reaches an invitation through its own link.
+ * Server rendered: the middleware rewrite cannot target a prerendered page on the
+ * Cloudflare adapter (see src/middleware.ts).
  */
-import { party, phoneHref } from "../../../components/frej/party";
-import Layout from "./_components/Layout.astro";
-
-const stops = [
-	{
-		title: "Uppdraget",
-		body: `${party.name} blir ${party.age} år. Expeditionen behöver dig!`,
-	},
-	{ title: "Avfärd", body: `${party.date}, ${party.time}` },
-	{ title: "Basläger", body: party.place },
-	{ title: "Utrustning", body: party.dress },
-];
+import Dino from "../../../components/frej/dino.astro";
+import Layout from "../_components/Layout.astro";
 ---
-<Layout>
-  <section class="invitation">
-    <header class="intro">
-      <p>Rawr betyder "Välkomna" på dinosauriska</p>
-      <h1>{party.name} fyller fyra!</h1>
-      <p></p>
-    </header>
-
-    <div class="trail">
-      <svg class="path" viewBox="0 0 100 1000" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M25 0 C 25 120, 75 130, 75 250 S 25 380, 25 500 S 75 630, 75 750 S 50 900, 50 1000" />
-      </svg>
-      <ol>
-        {stops.map((stop, i) => (
-          <li class="stop">
-            <span class="footprint" aria-hidden="true"></span>
-            <span class="number">{i + 1}</span>
-            <h2>{stop.title}</h2>
-            <p>{stop.body}</p>
-          </li>
-        ))}
-        <li class="stop program">
-          <span class="number">{stops.length + 1}</span>
-          <h2>Färdplan</h2>
-          <ul>{party.program.map((p) => <li><b>{p.time}</b> {p.what}</li>)}</ul>
-        </li>
-      </ol>
-    </div>
-
-    <footer class="goal">
-      <h2>Vi ses i kritan</h2>
-      <p>senast <strong>{party.rsvpBy}</strong></p>
-      <a href={`sms:${phoneHref(party.rsvpPhone)}`}>Skicka SMS</a>
-      <a href={`mailto:${party.rsvpEmail}`}>Skicka e-post</a>
-    </footer>
+<Layout title="Frej">
+  <section class="landing">
+    <Dino class="dino" fill="#d9822b" />
+    <p>Rawr betyder "Hej" på dinosauriska</p>
+    <h1>Frej</h1>
   </section>
 </Layout>
 
 <style>
-  .invitation {
+  .landing {
     --paper: #efe4cf; --ink: #3b2f1e; --path: #8b5a2b; --accent: #d9822b;
-    min-height: 100dvh; background: var(--paper); color: var(--ink);
-    padding: 32px 16px 48px; overflow-x: clip; font-weight: 700;
+    min-height: 100dvh; display: grid; place-content: center; text-align: center;
+    background: var(--paper); color: var(--ink); padding: 32px 16px; font-weight: 700;
   }
-  .intro { margin-bottom: 24px; }
-  .intro h1 { font-size: clamp(46px, 15vw, 62px); margin: 4px 0 0; color: var(--accent); line-height: 1; text-wrap: balance; text-shadow: 0 5px 0 var(--path); text-transform: uppercase; }
-  .intro p:last-child { margin: 4px 0 0; font-style: italic; }
-
-  .trail { position: relative; max-width: 520px; margin: 0 auto; }
-  .path { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .path path { fill: none; stroke: var(--path); stroke-width: 3; stroke-dasharray: 10 8; vector-effect: non-scaling-stroke; }
-  .trail ol { list-style: none; margin: 0; padding: 12px 0; display: grid; gap: 40px; }
-  .stop {
-    position: relative; width: 72%; padding: 18px 18px 18px 40px;
-    background: #fff9ee; border: 2px solid var(--path); border-radius: 4px 18px 4px 18px;
-    box-shadow: 4px 4px 0 rgba(59, 47, 30, .15);
-    /* stops alternate sides of the path and tilt a little */
-    justify-self: start; rotate: -1.5deg;
-  }
-  .stop:nth-child(even) { justify-self: end; rotate: 1.5deg; }
-
-  .number {
-    position: absolute; left: -18px; top: 14px; width: 40px; height: 40px; border-radius: 50%;
-    display: grid; place-items: center; background: var(--accent); color: #fff;
-    font-family: var(--font-titan-one); font-size: 22px; border: 3px solid var(--paper);
-  }
-  .stop h2 { margin: 0 0 4px; font-size: 22px; }
-  .stop p { margin: 0; line-height: 1.35; font-size: 15px; }
-  /* three-toed footprint above each stop, on the path side */
-  .footprint {
-    position: absolute; top: -28px; right: 10%; width: 26px; height: 26px; opacity: .55; transform: rotate(20deg);
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238b5a2b'%3E%3Cellipse cx='12' cy='16' rx='6' ry='6'/%3E%3Cellipse cx='5' cy='7' rx='2.5' ry='4'/%3E%3Cellipse cx='12' cy='4' rx='2.5' ry='4'/%3E%3Cellipse cx='19' cy='7' rx='2.5' ry='4'/%3E%3C/svg%3E") no-repeat center / contain;
-  }
-  .stop:nth-child(even) .footprint { right: auto; left: 10%; transform: rotate(-20deg); }
-  .program { transform: none; }
-  .program ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
-  .program b { font-family: ui-monospace, monospace; margin-right: 8px; }
-
-  .goal {
-    max-width: 520px; margin: 24px auto 0; padding: 60px 20px 24px; text-align: center; position: relative;
-    background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 18px;
-    display: grid; gap: 8px;
-  }
-  .dino { width: 150px; margin: -110px auto 0; display: block; }
-  .goal h2 { margin: 0; font-size: 34px; }
-  .goal p { margin: 0 0 8px; }
-  .goal a { display: block; padding: 14px; background: #fff; color: var(--ink); text-decoration: none; border-radius: 999px; font-weight: 700; }
-
-  @media (min-width: 640px) { .stop { width: 60%; } }
+  .dino { width: 160px; margin: 0 auto 16px; }
+  .landing p { margin: 0; font-style: italic; }
+  .landing h1 { font-size: clamp(46px, 15vw, 62px); margin: 4px 0 0; color: var(--accent); line-height: 1; text-shadow: 0 5px 0 var(--path); text-transform: uppercase; }
 </style>
