@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatEventDate, formatSlotTimes } from "./format";
+import { formatEventDate, formatSlotTimes, formatUpdatedAt } from "./format";
 
 describe("formatEventDate", () => {
 	test("spells out a date in Swedish", () => {
@@ -22,5 +22,13 @@ describe("formatSlotTimes", () => {
 		expect(
 			formatSlotTimes("2026-12-05T12:00:00Z", "2026-12-05T13:00:00Z"),
 		).toBe("13:00–14:00");
+	});
+});
+
+describe("formatUpdatedAt", () => {
+	test("renders a D1 UTC timestamp as a Swedish local date and time", () => {
+		expect(formatUpdatedAt("2026-10-01T12:05:00.000Z")).toBe(
+			"2026-10-01 14:05",
+		);
 	});
 });

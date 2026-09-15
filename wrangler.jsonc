@@ -24,6 +24,14 @@
 			"migrations_dir": "drizzle"
 		}
 	],
+	// Cloudflare Access protects `nilsfrank.se/admin*` at the edge and the admin page
+	// verifies the Access JWT itself against these (src/lib/access.ts). Placeholders: the
+	// Organizer fills in the Zero Trust team domain and the Access application's AUD tag
+	// at cutover (#7). Not secrets, so plain vars.
+	"vars": {
+		"ACCESS_TEAM_DOMAIN": "example.cloudflareaccess.com",
+		"ACCESS_AUD": "replace-with-access-application-aud"
+	},
 	"observability": {
 		"enabled": true
 	}

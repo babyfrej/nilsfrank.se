@@ -28,3 +28,14 @@ export function formatEventDate(isoDate: string): string {
 export function formatSlotTimes(isoStart: string, isoEnd: string): string {
 	return slotTime.formatRange(new Date(isoStart), new Date(isoEnd));
 }
+
+const timestamp = new Intl.DateTimeFormat("sv-SE", {
+	timeZone: TIME_ZONE,
+	dateStyle: "short",
+	timeStyle: "short",
+});
+
+/** An Rsvp's `updatedAt` (UTC ISO string from D1) as `"2026-10-01 14:05"` for the Organizer. */
+export function formatUpdatedAt(isoTimestamp: string): string {
+	return timestamp.format(new Date(isoTimestamp));
+}

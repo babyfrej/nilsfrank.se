@@ -1,0 +1,142 @@
+---
+import { getCollection } from "astro:content";
+/**
+ * The Organizer's view at `nilsfrank.se/admin`: every Event from the collection
+ * grouped by Tenant, each Slot's booked / seats (overbooked shown as such, never
+ * enforced) and all Rsvp rows including declines, newest answer first.
+ *
+ * Only reachable on the root site: a Tenant host rewrites `/admin` into
+ * `/tenants/<tenant>/admin`, which is an unknown Event slug and 404s.
+ *
+ * Cloudflare Access gates the route at the edge, and this page verifies the token it
+ * forwards itself so a misconfigured route or another hostname cannot bypass the policy
+ * (spec #1). No token or a bad one is a 403. Zero client JS, no interactivity.
+ */
+import { env } from "cloudflare:workers";
+import { createRemoteJWKSet } from "jose";
+import { db } from "../db/client";
+import { rsvp } from "../db/schema";
+import Layout from "../layouts/Layout.astro";
+import { verifyAccessJwt } from "../lib/access";
+import {
+	formatEventDate,
+	formatSlotTimes,
+	formatUpdatedAt,
+} from "../lib/format";
+import { slotTotals } from "../lib/rsvp";
+import type { Tenant } from "../lib/tenant";
+
+// Module scope so the team's public keys are fetched once and cached across requests.
+const access = {
+	jwks: createRemoteJWKSet(
+		new URL(`https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`),
+	),
+	issuer: `https://${env.ACCESS_TEAM_DOMAIN}`,
+	audience: env.ACCESS_AUD,
+};
+
+const token = Astro.request.headers.get("Cf-Access-Jwt-Assertion") ?? undefined;
+const organizer = await verifyAccessJwt(token, access);
+if (!organizer) return new Response("Forbidden", { status: 403 });
+
+// All Rsvps in one query, joined to Events and Slots in memory (ADR 0001).
+const events = await getCollection("events");
+const rsvps = await db.select().from(rsvp).orderBy(rsvp.updatedAt);
+
+const byTenant = Map.groupBy(events, (e) => e.data.tenant);
+const rsvpsFor = (tenant: Tenant, slug: string) =>
+	rsvps.filter((r) => r.tenant === tenant && r.event === slug).reverse();
+const slotLabel = (
+	slots: (typeof events)[number]["data"]["slots"],
+	slotId: string | null,
+) => {
+	const slot = slots.find((s) => s.id === slotId);
+	return slot ? formatSlotTimes(slot.start, slot.end) : (slotId ?? "–");
+};
+---
+<Layout title="Svar">
+  <h1>Svar</h1>
+  {[...byTenant].map(([tenant, tenantEvents]) => (
+    <section>
+      <h2>{tenant}</h2>
+      {tenantEvents.map((event) => {
+        const slug = event.id.slice(tenant.length + 1);
+        const own = rsvpsFor(tenant, slug);
+        return (
+          <article>
+            <h3>{event.data.title} <small>{tenant}.nilsfrank.se/{slug} · {formatEventDate(event.data.date)}</small></h3>
+            <ul class="slots">
+              {slotTotals(event.data.slots, own).map((slot) => (
+                <li class:list={{ overbooked: slot.overbooked }}>
+                  <b>{formatSlotTimes(slot.start, slot.end)}</b> {slot.booked} / {slot.seats} platser
+                  {slot.overbooked && <span> – överbokad</span>}
+                </li>
+              ))}
+            </ul>
+            {own.length === 0 ? (
+              <p>Inga svar ännu.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Namn</th><th>E-post</th><th>Tid</th><th>Kommer</th><th>Vuxna</th><th>Barn</th><th>Noteringar</th><th>Uppdaterad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {own.map((r) => (
+                    <tr class:list={{ declined: !r.attending }}>
+                      <td>{r.name}</td>
+                      <td><a href={`mailto:${r.email}`}>{r.email}</a></td>
+                      <td>{slotLabel(event.data.slots, r.slotId)}</td>
+                      <td>{r.attending ? "Ja" : "Nej"}</td>
+                      <td>{r.adults}</td>
+                      <td>{r.children}</td>
+                      <td>{r.notes}</td>
+                      <td><time datetime={r.updatedAt}>{formatUpdatedAt(r.updatedAt)}</time></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </article>
+        );
+      })}
+    </section>
+  ))}
+</Layout>
+
+<style>
+  main {
+    padding: 1rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.95rem;
+  }
+  h2 {
+    text-transform: capitalize;
+  }
+  h3 small {
+    display: block;
+    font-weight: normal;
+    color: #555;
+  }
+  .slots {
+    padding-left: 1.2rem;
+  }
+  .overbooked {
+    color: #b00020;
+    font-weight: bold;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.3rem 0.6rem;
+    border-bottom: 1px solid #ddd;
+    vertical-align: top;
+  }
+  .declined {
+    color: #777;
+  }
+</style>
