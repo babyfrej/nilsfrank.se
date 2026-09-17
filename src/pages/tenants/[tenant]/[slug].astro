@@ -1,0 +1,230 @@
+---
+/**
+ * The Event page a Guest opens at `<tenant>.nilsfrank.se/<slug>`. The middleware
+ * rewrites that host + path to `/tenants/<tenant>/<slug>`, and the entry is
+ * looked up by both the resolved Tenant and the slug so one Tenant's Event can
+ * never be opened on another Tenant's host.
+ *
+ * Rendered per request (no `prerender`): the Slots show live "booked / seats"
+ * from the Rsvps in D1, and the Rsvp form is prefilled with the household's own
+ * row when the `guest` cookie (set by the action) names it. Zero client JS:
+ * the form posts to `rsvp.submit`; a success redirects back here with `?tack`
+ * (POST → redirect → GET, so a reload never resubmits), errors render straight
+ * into the POST response next to the fields, with the typed values kept.
+ *
+ * Mobile-first "expedition trail": a wavy path snakes down the page with the
+ * facts as numbered stops; the Slots and the Rsvp form follow as the goal.
+ */
+import { actions, isInputError } from "astro:actions";
+import { getEntry, render } from "astro:content";
+import { and, eq } from "drizzle-orm";
+import { db } from "../../../db/client";
+import { rsvp } from "../../../db/schema";
+import Layout from "../../../layouts/Layout.astro";
+import { eventId } from "../../../lib/event";
+import { formatEventDate, formatSlotTimes, telHref } from "../../../lib/format";
+import { RSVP_DEFAULTS, type RsvpInput, slotTotals } from "../../../lib/rsvp";
+
+// The `[tenant]` segment only shapes the rewritten URL; the Tenant itself is taken
+// from locals so the lookup cannot be steered by the path.
+const { slug = "" } = Astro.params;
+const tenant = Astro.locals.tenant;
+const event = tenant
+	? await getEntry("events", eventId(tenant, slug))
+	: undefined;
+if (!event) return new Response(null, { status: 404 });
+
+const result = Astro.getActionResult(actions.rsvp.submit);
+if (result && !result.error) return Astro.redirect(`/${slug}?tack`, 303);
+const fieldErrors = isInputError(result?.error) ? result.error.fields : {};
+// Anything without an input of its own (unknown Event, tampered hidden `event`,
+// a POST without a submit button) gets the banner instead of a field message.
+const hasGeneralError =
+	result?.error !== undefined &&
+	(!isInputError(result.error) ||
+		fieldErrors.event !== undefined ||
+		fieldErrors.attending !== undefined);
+// The rejected form's values, kept by the middleware, so the Guest keeps their input.
+const submitted = result?.error ? Astro.locals.submitted : undefined;
+const saved = Astro.url.searchParams.has("tack");
+
+const { Content } = await render(event);
+const { title, date, place, program, rsvpBy, contact, slots } = event.data;
+
+// Rsvps live in D1, Slots in frontmatter; joined here in memory (ADR 0001).
+const rsvps = await db
+	.select()
+	.from(rsvp)
+	.where(and(eq(rsvp.tenant, tenant), eq(rsvp.event, slug)));
+const totals = slotTotals(slots, rsvps);
+
+// The household's own Rsvp, remembered by the `guest` cookie the action set.
+const guestEmail = Astro.cookies.get("guest")?.value;
+const own = guestEmail ? rsvps.find((r) => r.email === guestEmail) : undefined;
+
+/** Prefill: a rejected submission's values win over the stored Rsvp. */
+const field = (
+	name: keyof RsvpInput,
+	stored: string | number | null | undefined,
+) =>
+	submitted ? (submitted.get(name)?.toString() ?? "") : String(stored ?? "");
+const pickedSlot = submitted
+	? submitted.get("slotId")?.toString()
+	: own?.slotId;
+---
+<Layout title={title}>
+  <article class="event">
+    <header class="intro">
+      <h1>{title}</h1>
+      <Content />
+    </header>
+
+    <div class="trail">
+      <svg class="path" viewBox="0 0 100 1000" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M25 0 C 25 120, 75 130, 75 250 S 25 380, 25 500 S 75 630, 75 750 S 50 900, 50 1000" />
+      </svg>
+      <ol>
+        <li class="stop">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">1</span>
+          <h2>När</h2>
+          <p>{formatEventDate(date)}</p>
+        </li>
+        <li class="stop">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">2</span>
+          <h2>Var</h2>
+          <p>{place}</p>
+        </li>
+        <li class="stop program">
+          <span class="footprint" aria-hidden="true"></span>
+          <span class="number">3</span>
+          <h2>Program</h2>
+          <ul>{program.map((p) => <li><b>{p.time}</b> {p.text}</li>)}</ul>
+        </li>
+      </ol>
+    </div>
+
+    <section class="rsvp" id="svara">
+      <h2>Svara</h2>
+      {saved && <p class="notice" role="status">Tack! Ert svar är sparat. Ni kan ändra det här när som helst.</p>}
+      {hasGeneralError && <p class="error" role="alert">Något gick fel, försök igen.</p>}
+      {own && !own.attending && !submitted && <p class="notice">Ni har svarat att ni inte kan komma.</p>}
+
+      <form method="POST" action={actions.rsvp.submit}>
+        <input type="hidden" name="event" value={slug} />
+
+        <fieldset>
+          <legend>Tid</legend>
+          {totals.map((slot) => (
+            <label class="slot">
+              <input type="radio" name="slotId" value={slot.id} checked={pickedSlot === slot.id} />
+              <b>{formatSlotTimes(slot.start, slot.end)}</b>
+              <span>{slot.booked} / {slot.seats} platser</span>
+            </label>
+          ))}
+          {fieldErrors.slotId && <p class="error">{fieldErrors.slotId[0]}</p>}
+        </fieldset>
+
+        <label>
+          Namn
+          <input type="text" name="name" value={field("name", own?.name)} required autocomplete="name" />
+          {fieldErrors.name && <span class="error">{fieldErrors.name[0]}</span>}
+        </label>
+        <label>
+          E-post
+          <input type="email" name="email" value={field("email", own?.email)} required autocomplete="email" />
+          {fieldErrors.email && <span class="error">{fieldErrors.email[0]}</span>}
+        </label>
+        <div class="counts">
+          <label>
+            Vuxna
+            <input type="number" name="adults" min="1" value={field("adults", own?.adults ?? RSVP_DEFAULTS.adults)} />
+            {fieldErrors.adults && <span class="error">{fieldErrors.adults[0]}</span>}
+          </label>
+          <label>
+            Barn
+            <input type="number" name="children" min="0" value={field("children", own?.children ?? RSVP_DEFAULTS.children)} />
+            {fieldErrors.children && <span class="error">{fieldErrors.children[0]}</span>}
+          </label>
+        </div>
+        <label>
+          Allergier eller annat
+          <textarea name="notes" rows="2">{field("notes", own?.notes)}</textarea>
+        </label>
+
+        <button name="attending" value="true">Vi kommer!</button>
+        <button name="attending" value="false" class="decline">Vi kan tyvärr inte komma</button>
+      </form>
+
+      <p class="deadline">Svara senast <strong>{formatEventDate(rsvpBy)}</strong>. Frågor? {contact.name}, <a href={telHref(contact.phone)}>{contact.phone}</a> eller <a href={`mailto:${contact.email}`}>{contact.email}</a></p>
+    </section>
+  </article>
+</Layout>
+
+<style>
+  .event {
+    --paper: #efe4cf; --ink: #3b2f1e; --path: #8b5a2b; --accent: #d9822b;
+    min-height: 100dvh; background: var(--paper); color: var(--ink);
+    padding: 32px 16px 48px; overflow-x: clip; font-weight: 700;
+  }
+  .intro { margin-bottom: 24px; }
+  .intro h1 { font-size: clamp(38px, 12vw, 56px); margin: 4px 0 8px; color: var(--accent); line-height: 1; text-wrap: balance; text-shadow: 0 5px 0 var(--path); text-transform: uppercase; }
+  .intro :global(p) { margin: 4px 0 0; line-height: 1.35; }
+
+  .trail { position: relative; max-width: 520px; margin: 0 auto; }
+  .path { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .path path { fill: none; stroke: var(--path); stroke-width: 3; stroke-dasharray: 10 8; vector-effect: non-scaling-stroke; }
+  .trail ol { list-style: none; margin: 0; padding: 12px 0; display: grid; gap: 40px; }
+  .stop {
+    position: relative; width: 72%; padding: 18px 18px 18px 40px;
+    background: #fff9ee; border: 2px solid var(--path); border-radius: 4px 18px 4px 18px;
+    box-shadow: 4px 4px 0 rgba(59, 47, 30, .15);
+    /* stops alternate sides of the path and tilt a little */
+    justify-self: start; rotate: -1.5deg;
+  }
+  .stop:nth-child(even) { justify-self: end; rotate: 1.5deg; }
+
+  .number {
+    position: absolute; left: -18px; top: 14px; width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--accent); color: #fff;
+    font-family: var(--font-titan-one); font-size: 22px; border: 3px solid var(--paper);
+  }
+  .stop h2 { margin: 0 0 4px; font-size: 22px; }
+  .stop p { margin: 0; line-height: 1.35; font-size: 15px; }
+  /* three-toed footprint above each stop, on the path side */
+  .footprint {
+    position: absolute; top: -28px; right: 10%; width: 26px; height: 26px; opacity: .55; transform: rotate(20deg);
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238b5a2b'%3E%3Cellipse cx='12' cy='16' rx='6' ry='6'/%3E%3Cellipse cx='5' cy='7' rx='2.5' ry='4'/%3E%3Cellipse cx='12' cy='4' rx='2.5' ry='4'/%3E%3Cellipse cx='19' cy='7' rx='2.5' ry='4'/%3E%3C/svg%3E") no-repeat center / contain;
+  }
+  .stop:nth-child(even) .footprint { right: auto; left: 10%; transform: rotate(-20deg); }
+  .program ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
+  .program b { font-family: ui-monospace, monospace; margin-right: 8px; }
+
+  .rsvp {
+    max-width: 520px; margin: 24px auto 0; padding: 24px 20px;
+    background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 18px;
+    display: grid; gap: 12px;
+  }
+  .rsvp h2 { margin: 0; font-size: 34px; text-align: center; }
+  .rsvp form { display: grid; gap: 12px; }
+  .rsvp fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; }
+  .rsvp legend, .rsvp label { font-size: 15px; display: grid; gap: 4px; }
+  .rsvp legend { padding: 0; margin-bottom: 4px; }
+  .slot { display: flex !important; align-items: center; gap: 10px; padding: 10px 12px; background: #fff9ee; color: var(--ink); border-radius: 10px; }
+  .slot b { font-family: ui-monospace, monospace; }
+  .slot span { margin-left: auto; font-size: 13px; }
+  .rsvp input:not([type="radio"]), .rsvp textarea {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px;
+    font: inherit; color: var(--ink); background: #fff9ee;
+  }
+  .counts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rsvp button { padding: 14px; background: #fff; color: var(--ink); border: 2px solid var(--ink); border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer; }
+  .rsvp button.decline { background: transparent; color: #fff; border-color: #fff; }
+  .notice, .error { margin: 0; font-size: 14px; }
+  .error { color: #fff; background: rgba(59, 47, 30, .35); padding: 4px 8px; border-radius: 6px; }
+  .deadline { margin: 8px 0 0; text-align: center; font-size: 14px; }
+  .deadline a { color: #fff; }
+
+  @media (min-width: 640px) { .stop { width: 60%; } }
+</style>

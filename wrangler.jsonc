@@ -1,0 +1,38 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2026-09-11",
+	"compatibility_flags": ["global_fetch_strictly_public"],
+	"name": "nilsfrank-se",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	// One Worker serves the root site and every tenant; src/middleware.ts routes by host.
+	"routes": [
+		{ "pattern": "nilsfrank.se", "custom_domain": true },
+		{ "pattern": "frej.nilsfrank.se", "custom_domain": true },
+		{ "pattern": "helge.nilsfrank.se", "custom_domain": true }
+	],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	// Rsvps only (ADR 0001). database_id is a placeholder until the Organizer creates the
+	// database at cutover (#7); locally, wrangler only needs it to be a valid UUID.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "nilsfrank-se",
+			"database_id": "00000000-0000-4000-8000-000000000000",
+			"migrations_dir": "drizzle"
+		}
+	],
+	// Cloudflare Access protects `nilsfrank.se/admin*` at the edge and the admin page
+	// verifies the Access JWT itself against these (src/lib/access.ts). Placeholders: the
+	// Organizer fills in the Zero Trust team domain and the Access application's AUD tag
+	// at cutover (#7). Not secrets, so plain vars.
+	"vars": {
+		"ACCESS_TEAM_DOMAIN": "example.cloudflareaccess.com",
+		"ACCESS_AUD": "replace-with-access-application-aud"
+	},
+	"observability": {
+		"enabled": true
+	}
+}

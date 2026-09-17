@@ -1,51 +1,32 @@
 {
-  "name": "frej",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "postinstall": "prisma generate",
-    "dev": "next dev -p 80",
-    "dev:seed": "prisma db seed",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@hookform/resolvers": "3.9.0",
-    "@libsql/client": "0.11.0",
-    "@prisma/adapter-libsql": "5.19.1",
-    "@prisma/client": "5.18.0",
-    "@types/js-cookie": "3.0.6",
-    "@vanilla-extract/css": "1.15.3",
-    "@vanilla-extract/dynamic": "2.1.1",
-    "@vercel/analytics": "1.3.1",
-    "clsx": "2.1.1",
-    "date-fns": "3.6.0",
-    "jotai": "2.9.3",
-    "js-cookie": "3.0.5",
-    "next": "15.5.4",
-    "next-mdx-remote": "5.0.0",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "react-hook-form": "7.52.2",
-    "zod": "3.23.8"
-  },
-  "devDependencies": {
-    "@types/bun": "1.1.9",
-    "@types/node": "22.4.0",
-    "@types/react": "18.3.3",
-    "@types/react-dom": "18.3.0",
-    "@vanilla-extract/next-plugin": "2.4.3",
-    "eslint": "8.57.0",
-    "eslint-config-next": "14.2.5",
-    "eslint-config-prettier": "9.1.0",
-    "eslint-plugin-prettier": "5.2.1",
-    "postcss": "8.4.41",
-    "prettier": "3.3.3",
-    "prisma": "5.18.0",
-    "typescript": "5.5.4"
-  },
-  "prisma": {
-    "seed": "bun ./prisma/data-seed.ts"
-  }
+	"name": "nilsfrank-se",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro preview",
+		"start": "astro start",
+		"lint": "biome lint",
+		"format": "biome format",
+		"check": "biome check && tsc --noEmit",
+		"generate-types": "wrangler types",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "wrangler d1 migrations apply nilsfrank-se --local",
+		"db:seed": "wrangler d1 execute nilsfrank-se --local --file=seed.sql"
+	},
+	"dependencies": {
+		"@astrojs/cloudflare": "^14.3.1",
+		"astro": "7.3.2",
+		"drizzle-orm": "0.45.2",
+		"jose": "6.2.12",
+		"wrangler": "^4.131.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.13",
+		"@types/bun": "1.4.2",
+		"drizzle-kit": "0.31.10",
+		"typescript": "7.0.2"
+	}
 }

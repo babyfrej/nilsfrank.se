@@ -1,0 +1,28 @@
+---
+/**
+ * Frej's landing page at frej.nilsfrank.se. Deliberately neutral: it lists no
+ * Events, so a Guest only reaches an Event through its own link.
+ * Server rendered: the middleware rewrite cannot target a prerendered page on the
+ * Cloudflare adapter (see src/middleware.ts).
+ */
+import Dino from "../../../components/frej/dino.astro";
+import Layout from "../../../layouts/Layout.astro";
+---
+<Layout title="Frej">
+  <section class="landing">
+    <Dino class="dino" fill="#d9822b" />
+    <p>Rawr betyder "Hej" på dinosauriska</p>
+    <h1>Frej</h1>
+  </section>
+</Layout>
+
+<style>
+  .landing {
+    --paper: #efe4cf; --ink: #3b2f1e; --path: #8b5a2b; --accent: #d9822b;
+    min-height: 100dvh; display: grid; place-content: center; text-align: center;
+    background: var(--paper); color: var(--ink); padding: 32px 16px; font-weight: 700;
+  }
+  .dino { width: 160px; margin: 0 auto 16px; }
+  .landing p { margin: 0; font-style: italic; }
+  .landing h1 { font-size: clamp(46px, 15vw, 62px); margin: 4px 0 0; color: var(--accent); line-height: 1; text-shadow: 0 5px 0 var(--path); text-transform: uppercase; }
+</style>
