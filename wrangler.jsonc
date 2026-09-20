@@ -14,23 +14,24 @@
 		"directory": "./dist",
 		"binding": "ASSETS"
 	},
-	// Rsvps only (ADR 0001). database_id is a placeholder until the Organizer creates the
-	// database at cutover (#7); locally, wrangler only needs it to be a valid UUID.
+	// Rsvps only (ADR 0001). database created at cutover (#7).
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "nilsfrank-se",
-			"database_id": "00000000-0000-4000-8000-000000000000",
+			"database_id": "c2b8a0bd-1bfd-49e5-bf84-b25ad90ac7b1",
 			"migrations_dir": "drizzle"
 		}
 	],
+	// Astro sessions (Actions need them). Wrangler auto-provisions a KV binding without an id,
+	// but the namespace already exists, so pin it.
+	"kv_namespaces": [{ "binding": "SESSION", "id": "8e9f419c8f80423daaaff3cb4918bbd1" }],
 	// Cloudflare Access protects `nilsfrank.se/admin*` at the edge and the admin page
-	// verifies the Access JWT itself against these (src/lib/access.ts). Placeholders: the
-	// Organizer fills in the Zero Trust team domain and the Access application's AUD tag
-	// at cutover (#7). Not secrets, so plain vars.
+	// verifies the Access JWT itself against these (src/lib/access.ts). Zero Trust team
+	// domain and the Access application's AUD tag. Not secrets, so plain vars.
 	"vars": {
-		"ACCESS_TEAM_DOMAIN": "example.cloudflareaccess.com",
-		"ACCESS_AUD": "replace-with-access-application-aud"
+		"ACCESS_TEAM_DOMAIN": "niklas-frank.cloudflareaccess.com",
+		"ACCESS_AUD": "40b66ff4445d3e987b8801ff02c6fd56323a17b7bb064aca305a4cc722528dcb"
 	},
 	"observability": {
 		"enabled": true
